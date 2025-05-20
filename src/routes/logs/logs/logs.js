@@ -3,6 +3,7 @@ const { PrismaClient } = require("@prisma/client");
 
 const { dateFormat } = require("../../../helpers");
 const io = require("../../../../app");
+const verifyUser = require("../../auth/auth/utils/auth");
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,10 @@ router = new express.Router();
 
 router.get("/", async (req, res) => {
   try {
+    const { isVerify } = await verifyUser.verifyUser(req.user);
+    if (!isVerify) {
+      return res.status(403).json({ success: false, error: "User no have permision" });
+    }
     let { page, limit, startDate, endDate } = req.query;
     page = parseInt(page) || 1; 
     limit = parseInt(limit) || 10; 
