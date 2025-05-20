@@ -54,7 +54,7 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    await registerUser(email, password, name);
+    await registerUser(req, email, password, name);
     return res
       .status(201)
       .json({ success: true, message: "User registered successfully" });

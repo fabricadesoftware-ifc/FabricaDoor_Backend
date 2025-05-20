@@ -7,56 +7,14 @@ const validateEmail = require("../../../../helpers/validate/fields");
 const { emailForgetPassword } = require("../../../../helpers/mail/mail");
 const { ValidationError, AuthError } = require("../../../../helpers");
 const { logger } = require("../../../../middlewares");
+const { verifyToken } = require("../../../../middlewares/index");
 
 const getRandomImageUrl = require("../../../../helpers/picture/picture_sorter");
 
 const cache = new NodeCache({ stdTTL: 864000, checkperiod: 1800 });
 const prisma = new PrismaClient();
 
-/**
- * Registra um novo usuário.
- * @param {string} email
- * @param {string} password
- * @param {string} name
- * @returns {object} usuário criado
- * @throws {ValidationError} se os dados forem inválidos
- * @throws {Error} se ocorrer um erro durante o registro
- */
-async function registerUser(email, password, name) {
-  if (!email || !password || !name) {
-    throw new ValidationError("All fields are required");
-  }
-  if (!validateEmail(email)) {
-    throw new ValidationError("Invalid email format");
-  }
-  if (password.length < 6) {
-    throw new ValidationError("Password must be at least 6 characters long");
-  }
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    throw new ValidationError("Email is already in use");
-  }
-
-  try {
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        picture: getRandomImageUrl(
-          "https://door-api.fabricadesoftware.ifc.edu.br"
-        ),
-      }, //mudar depois paia
-    });
-    return user;
-  } catch (error) {
-    logger.error(`Registration failed: ${error.message}`);
-    throw new Error(`Registration failed: ${error.message}`);
-  }
-}
 
 /**
  * Realiza o login do usuário.
@@ -128,6 +86,56 @@ async function verifyUser(userData) {
   } catch (error) {
     logger.error(`Verification failed: ${error.message}`);
     throw new Error(`Verification failed: ${error.message}`);
+  }
+}
+
+/**
+ * Registra um novo usuário.
+ * @param {string} email
+ * @param {string} password
+ * @param {string} name
+ * @returns {object} usuário criado
+ * @throws {ValidationError} se os dados forem inválidos
+ * @throws {Error} se ocorrer um erro durante o registro
+ */
+async function registerUser(req, email, password, name) {
+
+  if (!email || !password || !name) {
+    throw new ValidationError("All fields are required");
+  }
+  if (!validateEmail(email)) {
+    throw new ValidationError("Invalid email format");
+  }
+  if (password.length < 6) {
+    throw new ValidationError("Password must be at least 6 characters long");
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw new ValidationError("Email is already in use");
+  }
+
+  try {
+    const { isSuper } = verifyUser(req)
+    if (!isSuper){
+      throw new ValidationError("Usuario invalido😱😱😱");
+    }
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+        picture: getRandomImageUrl(
+          "https://door-api.fabricadesoftware.ifc.edu.br"
+        ),
+      }, //mudar depois paia
+    });
+    return user;
+  } catch (error) {
+    logger.error(`Registration failed: ${error.message}`);
+    throw new Error(`Registration failed: ${error.message}`);
   }
 }
 
