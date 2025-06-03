@@ -116,10 +116,10 @@ async function registerUser(req, email, password, name) {
   }
 
   try {
-    const { isSuper } = verifyUser(req)
-    if (!isSuper){
-      throw new ValidationError("Usuario invalido😱😱😱");
-    }
+    // const { isSuper } = verifyUser(req)
+    // if (!isSuper){
+    //   throw new ValidationError("Usuario invalido😱😱😱");
+    // }
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
     const user = await prisma.user.create({
