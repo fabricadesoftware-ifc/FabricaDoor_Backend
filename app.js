@@ -20,6 +20,7 @@ const io = new Server(server, {
   cors: {
     origin: "*",
   },
+  allowEIO3: true,
 });
 
 app.use(express.json());

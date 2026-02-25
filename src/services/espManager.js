@@ -17,10 +17,15 @@ function init(io) {
 
   espNamespace.use((socket, next) => {
     const key = socket.handshake.auth?.key;
+    logger.info(
+      `ESP /esp auth attempt - received key: "${key}" | expected: "${DOOR_KEY}" | match: ${key === DOOR_KEY}`,
+    );
+    logger.info(`ESP handshake: ${JSON.stringify(socket.handshake.auth)}`);
     if (key === DOOR_KEY) {
+      logger.info(`ESP auth success from ${socket.id}`);
       next();
     } else {
-      logger.warn(`ESP connection rejected: invalid key`);
+      logger.warn(`ESP connection rejected: invalid key (got "${key}")`);
       next(new Error("Authentication failed"));
     }
   });
