@@ -1,4 +1,4 @@
-const logs = require("./logs/logs");
+const { router: logs } = require("./logs/logs");
 
 module.exports = {
   logs,

@@ -1,4 +1,5 @@
 const express = require("express");
+const { PrismaClient } = require("@prisma/client");
 const {
   validateRfid,
   getAllRfids,
@@ -14,6 +15,8 @@ const verifyUser = require("../../auth/auth/utils/auth");
 const { logger } = require("../../../middlewares");
 const { userLog } = require("../../logs/logs/logs");
 
+const prisma = new PrismaClient();
+
 const router = new express.Router();
 
 router.post("/door", async (req, res) => {
@@ -22,11 +25,28 @@ router.post("/door", async (req, res) => {
     return res.status(400).json({ success: false, error: "rfid is required" });
   }
   try {
+    const tag = await prisma.rfidTag.findUnique({
+      where: { rfid },
+      include: { user: true },
+    });
+
     const isValid = await validateRfid(rfid);
     if (isValid) {
+      await userLog(
+        tag?.user_id || null,
+        `Acesso autorizado via RFID ${rfid}`,
+        "ACCESS_GRANTED",
+        tag?.id || null,
+      );
       return res.status(200).json({ success: true, message: "Door open" });
     } else {
-    res.status(401).json({ success: false, message: "não autorizado skibidi" });
+      await userLog(
+        tag?.user_id || null,
+        `Acesso negado via RFID ${rfid}`,
+        "ACCESS_DENIED",
+        tag?.id || null,
+      );
+      res.status(401).json({ success: false, message: "não autorizado" });
     }
   } catch (error) {
     res
@@ -40,7 +60,9 @@ router.post("/assign", async (req, res) => {
 
   const error = validateRequestBody(["rfid", "userId"], req.body);
   if (error) {
-    return res.status(400).json({ success: false, error: error, req: req.body });
+    return res
+      .status(400)
+      .json({ success: false, error: error, req: req.body });
   }
   try {
     const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
@@ -55,21 +77,21 @@ router.post("/assign", async (req, res) => {
         .status(401)
         .json({ success: false, message: "RFID not assigned" });
     }
-   
-    res.status(200).json({ success: true, message: "RFID assigned to user successfully" });
+
+    res
+      .status(200)
+      .json({ success: true, message: "RFID assigned to user successfully" });
     await userLog(
       req.user.id,
       `User ${req.user.name} assigned RFID ${rfid} to user ${userId}`,
-      "UPDATE"
+      "UPDATE",
     );
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -89,27 +111,25 @@ router.post("/desassign", async (req, res) => {
     }
     const isDesassigned = await desAssignRfidToUser(rfid, Number(userId));
     if (!isDesassigned) {
-      res.status(401).json({ success: false, message: "RFID not desassigned" });
-      
+      return res
+        .status(401)
+        .json({ success: false, message: "RFID not desassigned" });
     }
+    await userLog(
+      req.user.id,
+      `User ${req.user.name} desassigned RFID ${rfid} to user ${userId}`,
+      "UPDATE",
+    );
     return res.status(200).json({
       success: true,
       message: "RFID desassigned to user successfully",
     });
-    await userLog(
-      req.user.id,
-      `User ${req.user.name} desassigned RFID ${rfid} to user ${userId}`,
-      "UPDATE"
-    );
-    
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -119,7 +139,7 @@ router.get("/", async (req, res) => {
   }
   try {
     const { isVerify } = await verifyUser.verifyUser(req.user);
-    logger.info(isVerify)
+    logger.info(isVerify);
     if (!isVerify) {
       return res
         .status(403)
@@ -128,13 +148,11 @@ router.get("/", async (req, res) => {
     const allRfids = await getAllRfids();
     res.status(200).json({ success: true, data: allRfids });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -142,11 +160,11 @@ router.post("/:rfid", async (req, res) => {
   const { rfid } = req.params;
 
   try {
-     const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
-     if (!isVerify || !isSuper) {
-       return res
-         .status(403)
-         .json({ success: false, error: "User no have permision" });
+    const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
+    if (!isVerify || !isSuper) {
+      return res
+        .status(403)
+        .json({ success: false, error: "User no have permision" });
     }
     const exist = await getRfid(rfid);
 
@@ -162,13 +180,11 @@ router.post("/:rfid", async (req, res) => {
       .status(201)
       .json({ success: true, message: "RFID created successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -182,21 +198,17 @@ router.delete("/:id", async (req, res) => {
         .json({ success: false, error: "User no have permision" });
     }
     const deletedRfid = await removeRfid(Number(id));
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "RFID deleted successfully",
-        data: deletedRfid,
-      });
+    res.status(200).json({
+      success: true,
+      message: "RFID deleted successfully",
+      data: deletedRfid,
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -210,21 +222,17 @@ router.put("/update/:id", async (req, res) => {
         .json({ success: false, error: "User no have permission" });
     }
     const updatedRfid = await permissionRfid(Number(id));
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "RFID updated successfully",
-        data: updatedRfid,
-      });
+    res.status(200).json({
+      success: true,
+      message: "RFID updated successfully",
+      data: updatedRfid,
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 

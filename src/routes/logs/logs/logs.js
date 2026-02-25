@@ -13,11 +13,13 @@ router.get("/", async (req, res) => {
   try {
     const { isVerify } = await verifyUser.verifyUser(req.user);
     if (!isVerify) {
-      return res.status(403).json({ success: false, error: "User no have permision" });
+      return res
+        .status(403)
+        .json({ success: false, error: "User no have permision" });
     }
     let { page, limit, startDate, endDate } = req.query;
-    page = parseInt(page) || 1; 
-    limit = parseInt(limit) || 10; 
+    page = parseInt(page) || 1;
+    limit = parseInt(limit) || 10;
     const skip = (page - 1) * limit;
 
     let dateFilter = {};
@@ -25,8 +27,8 @@ router.get("/", async (req, res) => {
       dateFilter = {
         date: {
           ...(startDate && { gte: new Date(startDate) }),
-          ...(endDate && { lte: new Date(endDate) })
-        }
+          ...(endDate && { lte: new Date(endDate) }),
+        },
       };
     }
 
@@ -35,7 +37,18 @@ router.get("/", async (req, res) => {
       skip: skip,
       take: limit,
       orderBy: {
-        date: "desc", 
+        date: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            picture: true,
+          },
+        },
+        rfid: true,
       },
     });
 
@@ -44,7 +57,7 @@ router.get("/", async (req, res) => {
     });
 
     const totalLogs = await prisma.logs.count({
-      where: dateFilter
+      where: dateFilter,
     });
     const totalPages = Math.ceil(totalLogs / limit);
 
@@ -63,15 +76,14 @@ router.get("/", async (req, res) => {
   }
 });
 
-
 router.post("/", async (req, res) => {
-  let { type, message } = req.body;
+  let { type, message, user_id, rfid_id } = req.body;
   if (!type || !message) {
     return res.status(400).json({ error: "type and message are required" });
   }
 
-  if (message !== String){
-    message = JSON.stringify(message)
+  if (typeof message !== "string") {
+    message = JSON.stringify(message);
   }
   res.status(200).json({ success: true, message: "Log is being processed" });
 
@@ -80,6 +92,8 @@ router.post("/", async (req, res) => {
       data: {
         type,
         message,
+        ...(user_id && { user_id: Number(user_id) }),
+        ...(rfid_id && { rfid_id: Number(rfid_id) }),
       },
     });
 
@@ -94,10 +108,21 @@ router.get("/logs/user/:userId", async (req, res) => {
   try {
     const logs = await prisma.logs.findMany({
       where: {
-        user_id: userId,
+        user_id: Number(userId),
       },
       orderBy: {
         date: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            picture: true,
+          },
+        },
+        rfid: true,
       },
     });
 
@@ -111,13 +136,14 @@ router.get("/logs/user/:userId", async (req, res) => {
   }
 });
 
-async function userLog(userId, message, type){
+async function userLog(userId, message, type, rfidId) {
   try {
     const log = await prisma.logs.create({
       data: {
         user_id: userId,
         message,
         type,
+        ...(rfidId && { rfid_id: rfidId }),
       },
     });
     io.io.emit("logs", { data: log });
@@ -126,6 +152,4 @@ async function userLog(userId, message, type){
   }
 }
 
-
-
-module.exports = router, { userLog };
+module.exports = { router, userLog };
