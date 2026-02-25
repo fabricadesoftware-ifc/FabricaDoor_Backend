@@ -8,9 +8,11 @@ const {
   resetPassword,
 } = require("./utils/auth");
 const { validateRequestBody } = require("../../../helpers/validate/request");
-const { verifyToken } = require("./utils/token");
+const { verifyToken, verifyRefreshToken, generateToken, generateRefreshToken } = require("./utils/token");
 const { logger } = require("../../../middlewares");
+const { PrismaClient } = require("@prisma/client");
 
+const prisma = new PrismaClient();
 const router = new express.Router();
 
 /**
@@ -28,12 +30,11 @@ router.post("/login", async (req, res) => {
   }
 
   try {
-    const { token, user } = await loginUser(email, password);
-    // Removendo o campo de senha para não expor informações sensíveis
+    const { token, refreshToken, user } = await loginUser(email, password);
     const { password: _, ...userWithoutPassword } = user;
     return res
       .status(200)
-      .json({ success: true, token, data: userWithoutPassword });
+      .json({ success: true, token, refreshToken, data: userWithoutPassword });
   } catch (error) {
     logger.error(`Login route error: ${error.message}`);
     return res.status(400).json({ success: false, error: error.message });
@@ -84,6 +85,60 @@ router.get("/verify", async (req, res) => {
   } catch (error) {
     logger.error(`Verify route error: ${error.message}`);
     return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Rota de refresh token.
+ * Recebe o refresh token e retorna um novo access token + novo refresh token.
+ */
+router.post("/refresh", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res
+      .status(400)
+      .json({ success: false, error: "Refresh token is required" });
+  }
+
+  try {
+    const decoded = verifyRefreshToken(refreshToken);
+    if (decoded.error) {
+      return res
+        .status(401)
+        .json({ success: false, error: decoded.error });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isSuper: true,
+        isVerified: true,
+        picture: true,
+      },
+    });
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, error: "User not found" });
+    }
+
+    const newToken = generateToken(user.id);
+    const newRefreshToken = generateRefreshToken(user.id);
+
+    return res.status(200).json({
+      success: true,
+      token: newToken,
+      refreshToken: newRefreshToken,
+      data: user,
+    });
+  } catch (error) {
+    logger.error(`Refresh token route error: ${error.message}`);
+    return res.status(401).json({ success: false, error: "Invalid refresh token" });
   }
 });
 

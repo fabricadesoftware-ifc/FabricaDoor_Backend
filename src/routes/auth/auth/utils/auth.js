@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const NodeCache = require("node-cache");
 const { PrismaClient } = require("@prisma/client");
 
-const { generateToken, generatePasswordResetToken } = require("./token");
+const { generateToken, generateRefreshToken, generatePasswordResetToken } = require("./token");
 const validateEmail = require("../../../../helpers/validate/fields");
 const { emailForgetPassword } = require("../../../../helpers/mail/mail");
 const { ValidationError, AuthError } = require("../../../../helpers");
@@ -44,11 +44,12 @@ async function loginUser(email, password) {
     }
 
     const token = generateToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
     await prisma.user.update({
       where: { id: user.id },
       data: { updated_at: new Date() },
     });
-    return { token, user };
+    return { token, refreshToken, user };
   } catch (error) {
     logger.error(`Login failed: ${error.message}`);
     throw error;
