@@ -1,13 +1,50 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
+const { startOfDay, endOfDay } = require("date-fns");
+const { toZonedTime, fromZonedTime } = require("date-fns-tz");
 
 const { dateFormat } = require("../../../helpers");
 const io = require("../../../../app");
 const verifyUser = require("../../auth/auth/utils/auth");
 
 const prisma = new PrismaClient();
+const TIMEZONE = "America/Sao_Paulo";
 
 router = new express.Router();
+
+router.get("/today", async (req, res) => {
+  try {
+    const { isVerify } = await verifyUser.verifyUser(req.user);
+    if (!isVerify) {
+      return res
+        .status(403)
+        .json({ success: false, error: "User no have permision" });
+    }
+
+    const now = toZonedTime(new Date(), TIMEZONE);
+    const dayStart = fromZonedTime(startOfDay(now), TIMEZONE);
+    const dayEnd = fromZonedTime(endOfDay(now), TIMEZONE);
+
+    const count = await prisma.logs.count({
+      where: {
+        date: {
+          gte: dayStart,
+          lte: dayEnd,
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        count,
+        date: dateFormat(now),
+      },
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
 router.get("/", async (req, res) => {
   try {
