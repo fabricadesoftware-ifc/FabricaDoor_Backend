@@ -1,1 +1,5 @@
-module.exports = require("./open/door");
+const door = require("./open/door");
+
+module.exports = {
+  door,
+};
