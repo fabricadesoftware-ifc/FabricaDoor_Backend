@@ -44,7 +44,7 @@ app.use(
     noSniff: true,
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     xssFilter: true,
-  })
+  }),
 );
 
 app.use(cors());
@@ -62,8 +62,11 @@ io.on("connection", (socket) => {
   });
 });
 
-exports.io = io;
+// Inicializa comunicação WebSocket com o ESP32
+const espManager = require("./src/services/espManager");
+espManager.init(io);
 
+exports.io = io;
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces();

@@ -2,7 +2,7 @@ const { PrismaClient } = require("@prisma/client");
 const NodeCache = require("node-cache");
 
 const { logger } = require("../../../../middlewares");
-const  { updateCache }  = require("../../../health/heartbeat/utils/health");
+const { updateCache } = require("../../../health/heartbeat/utils/health");
 const {
   dateFormat,
   NotFoundError,
@@ -116,12 +116,12 @@ async function getAllRfids() {
     const cachedRfids = cache.get(cacheKey);
     if (cachedRfids) {
       logger.warn(
-        "Falha ao buscar no banco. Retornando dados do cache: " + error.message
+        "Falha ao buscar no banco. Retornando dados do cache: " + error.message,
       );
       return cachedRfids;
     }
     return new Error(
-      `Falha ao recuperar os RFIDs e nenhum cache disponível: ${error.message}`
+      `Falha ao recuperar os RFIDs e nenhum cache disponível: ${error.message}`,
     );
   }
 }
@@ -189,7 +189,7 @@ async function permissionRfid(rfid) {
       where: { id: rfid },
       data: { valid: !tag.valid },
     });
-    await updateCache(req);
+    await updateCache();
     return updatedRfid;
   } catch (error) {
     return new Error(`Failed to update RFID permission: ${error.message}`);

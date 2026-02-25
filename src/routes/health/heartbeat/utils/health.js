@@ -3,7 +3,6 @@ const { PrismaClient } = require("@prisma/client");
 const { HealthError, ValidationError } = require("../../../../helpers");
 const NodeCache = require("node-cache");
 const { logger } = require("../../../../middlewares");
-const axios = require("axios");
 
 const cache = new NodeCache({ stdTTL: 864000, checkperiod: 1800 });
 
@@ -46,10 +45,7 @@ async function getIp(req) {
     if (!ip) {
       return new HealthError("Ip not found");
     }
-    
-    console.log(ip);
-    logger.info("health" + JSON.stringify(ip));
-    console.log(ip.ip);
+
     return ip.ip;
   } catch (error) {
     console.error(error);
@@ -74,25 +70,15 @@ async function getMode() {
   }
 }
 
-async function updateCache(req){
-  try{
-    const ip = await getIp(req);
-    logger.info("passou aqui")
-    if (!ip) {
-      return new HealthError("Ip not found");
+async function updateCache() {
+  try {
+    const espManager = require("../../../../services/espManager");
+    if (!espManager.isConnected()) {
+      return new HealthError("ESP32 não está conectado");
     }
-    const url = "http://" + ip + ":19003/cache";
-    logger.info("Cache URL: " + url);
-
-    const response = await axios.get(url, {
-      headers : {
-        Authorization: "Bearer " + DOOR_KEY
-      }
-    });
-    
-    return response.data;
-  }
-  catch(error){
+    const response = await espManager.sendCommand("refresh-cache");
+    return response;
+  } catch (error) {
     return new HealthError(`Cache update failed: ${error.message}`);
   }
 }
