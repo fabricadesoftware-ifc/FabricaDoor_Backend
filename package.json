@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
+  "engines": {
+    "node": "22.x"
+  },
+  "prisma": {
+    "schema": "src/database/prisma/schema.prisma"
+  },
   "scripts": {
     "start": "node app.js",
     "postinstall": "prisma generate"
