@@ -14,8 +14,6 @@ const getRandomImageUrl = require("../../../../helpers/picture/picture_sorter");
 const cache = new NodeCache({ stdTTL: 864000, checkperiod: 1800 });
 const prisma = new PrismaClient();
 
-
-
 /**
  * Realiza o login do usuário.
  * @param {string} email
@@ -66,14 +64,15 @@ async function loginUser(email, password) {
 async function verifyUser(userData) {
   try {
     logger.info(`Verifying user: ${JSON.stringify(userData)}`);
-    const cacheKey = `user_${userData.userId}`;
+    const userId = userData.id || userData.userId;
+    const cacheKey = `user_${userId}`;
     const cachedUser = cache.get(cacheKey);
     if (cachedUser) {
       return cachedUser;
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userData.userId },
+      where: { id: userId },
     });
     logger.info(`User fetched for verification: ${JSON.stringify(user)}`);
     if (!user) {
@@ -99,7 +98,6 @@ async function verifyUser(userData) {
  * @throws {Error} se ocorrer um erro durante o registro
  */
 async function registerUser(req, email, password, name) {
-
   if (!email || !password || !name) {
     throw new ValidationError("All fields are required");
   }
@@ -128,7 +126,7 @@ async function registerUser(req, email, password, name) {
         password: hashedPassword,
         name,
         picture: getRandomImageUrl(
-          "https://door-api.fabricadesoftware.ifc.edu.br"
+          "https://door-api.fabricadesoftware.ifc.edu.br",
         ),
       }, //mudar depois paia
     });
