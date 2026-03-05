@@ -125,6 +125,24 @@ router.post("/", async (req, res) => {
   res.status(200).json({ success: true, message: "Log is being processed" });
 
   try {
+    // Se não foi informado rfid_id, tenta extrair o código RFID da mensagem
+    if (!rfid_id && !user_id) {
+      const rfidMatch = message.match(/\b([A-Fa-f0-9]{8,})\b/);
+      if (rfidMatch) {
+        const rfidCode = rfidMatch[1];
+        const tag = await prisma.rfidTag.findUnique({
+          where: { rfid: rfidCode },
+          select: { id: true, user_id: true },
+        });
+        if (tag) {
+          rfid_id = tag.id;
+          if (tag.user_id) {
+            user_id = tag.user_id;
+          }
+        }
+      }
+    }
+
     const log = await prisma.logs.create({
       data: {
         type,
