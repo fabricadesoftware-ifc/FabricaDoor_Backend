@@ -2,7 +2,11 @@ const bcrypt = require("bcrypt");
 const NodeCache = require("node-cache");
 const { PrismaClient } = require("@prisma/client");
 
-const { generateToken, generateRefreshToken, generatePasswordResetToken } = require("./token");
+const {
+  generateToken,
+  generateRefreshToken,
+  generatePasswordResetToken,
+} = require("./token");
 const validateEmail = require("../../../../helpers/validate/fields");
 const { emailForgetPassword } = require("../../../../helpers/mail/mail");
 const { ValidationError, AuthError } = require("../../../../helpers");
@@ -191,10 +195,32 @@ async function resetPassword(token, newPassword) {
   }
 
   try {
-    // OBS.: É esperado que o token seja armazenado em um campo específico (não sobrescrevendo a senha)
+    // Verifica se o token é um JWT válido e não expirou
+    const jwt = require("jsonwebtoken");
+    const { JWT_SECRET } = require("../../../../config");
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded.type !== "password_reset") {
+        throw new AuthError("Invalid token type");
+      }
+    } catch (jwtError) {
+      if (jwtError.name === "TokenExpiredError") {
+        // Limpa o token expirado do banco
+        await prisma.user.updateMany({
+          where: { token: token },
+          data: { token: null },
+        });
+        throw new AuthError(
+          "Token expirado. Solicite um novo link de redefinição de senha.",
+        );
+      }
+      if (jwtError instanceof AuthError) throw jwtError;
+      throw new AuthError("Token inválido.");
+    }
+
     const user = await prisma.user.findUnique({ where: { token: token } });
     if (!user) {
-      throw new AuthError("User not found");
+      throw new AuthError("Token inválido ou já utilizado.");
     }
 
     const salt = await bcrypt.genSalt(12);
@@ -208,7 +234,7 @@ async function resetPassword(token, newPassword) {
     return "Password updated successfully";
   } catch (error) {
     logger.error(`Password update failed: ${error.message}`);
-    throw new Error(`Password reset failed: ${error.message}`);
+    throw error;
   }
 }
 

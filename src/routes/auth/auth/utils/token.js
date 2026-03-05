@@ -18,7 +18,9 @@ const generateToken = (userId) => {
 };
 
 const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId, type: "refresh" }, REFRESH_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ userId, type: "refresh" }, REFRESH_SECRET, {
+    expiresIn: "7d",
+  });
 };
 
 const verifyRefreshToken = (token) => {
@@ -34,9 +36,9 @@ const verifyRefreshToken = (token) => {
 };
 
 const generatePasswordResetToken = (userId) => {
-  const token = jwt
-    .sign({ userId }, JWT_SECRET, { expiresIn: "5m" })
-    .slice(0, 10);
+  const token = jwt.sign({ userId, type: "password_reset" }, JWT_SECRET, {
+    expiresIn: "30m",
+  });
   return token;
 };
 

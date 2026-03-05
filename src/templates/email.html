@@ -3,23 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Recovery</title>
+    <title>Redefinição de Senha</title>
 </head>
 <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; margin: 0; padding: 0;">
     <div style="max-width: 600px; margin: 20px auto; background: #fff; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #333; text-align: center;">Password Recovery</h2>
-        <p style="color: #555;">Hello,</p>
-        <p style="color: #555;">You requested to reset your password. Here is your new temporary password:</p>
+        <h2 style="color: #333; text-align: center;">Redefinição de Senha</h2>
+        <p style="color: #555;">Olá,</p>
+        <p style="color: #555;">Você solicitou a redefinição da sua senha. Clique no botão abaixo para criar uma nova senha:</p>
 
-        <div style="text-align: center; margin: 20px 0;">
-            <input type="text" value="${password}" readonly 
-                   style="padding: 10px; font-size: 18px; border: 1px solid #ccc; border-radius: 5px; width: 80%; text-align: center; cursor: pointer;" 
-                   onclick="this.select(); document.execCommand('copy');">
-          </div>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}"
+               style="display: inline-block; padding: 14px 32px; font-size: 16px; color: #fff; background-color: #4CAF50; border-radius: 6px; text-decoration: none; font-weight: bold;">
+                Redefinir Senha
+            </a>
+        </div>
 
-        <p style="color: #555;">Highlight the password above to copy it. Use it to log in and make sure to change your password afterward for security reasons.</p>
+        <p style="color: #555; font-size: 13px;">Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+        <p style="word-break: break-all; color: #1a73e8; font-size: 13px;">${resetLink}</p>
 
-        <p style="font-size: 12px; color: #999; text-align: center;">This is an automated message. Please do not reply.</p>
+        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+
+        <p style="color: #999; font-size: 12px;">Este link expira em <strong>30 minutos</strong>. Se você não solicitou essa redefinição, ignore este email.</p>
+        <p style="font-size: 12px; color: #999; text-align: center;">Esta é uma mensagem automática. Por favor, não responda.</p>
     </div>
 </body>
 </html>

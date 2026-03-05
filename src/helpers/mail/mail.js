@@ -30,7 +30,7 @@ const path = require("path");
 //   });
 // }
 
-async function emailForgetPassword(password, recipientList) {
+async function emailForgetPassword(token, recipientList) {
   try {
     if (typeof recipientList === "string") {
       recipientList = JSON.parse(recipientList);
@@ -43,26 +43,32 @@ async function emailForgetPassword(password, recipientList) {
         pass: process.env.EMAIL_HOST_PASSWORD,
       },
     });
-     const templatePath = path.join(__dirname, "../../templates/email.html");
-       const emailTemplate = fs
-         .readFileSync(templatePath, "utf-8")
-         .replace("${password}", password);
+
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://door.fabricadesoftware.ifc.edu.br";
+    const resetLink = `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+    const templatePath = path.join(__dirname, "../../templates/email.html");
+    const emailTemplate = fs
+      .readFileSync(templatePath, "utf-8")
+      .replace("${resetLink}", resetLink)
+      .replace("${token}", token);
+
     const mailOptions = {
       from: process.env.EMAIL_HOST_USER,
       to: recipientList,
-      subject: "Forget Password",
+      subject: "Redefinição de Senha - Door Auth",
       html: emailTemplate,
     };
 
     const info = await transporter.sendMail(mailOptions);
 
     console.log("Email enviado: " + info.response);
-    return { success: true, response: info.response }; // Retorna sucesso e informação do email enviado
+    return { success: true, response: info.response };
   } catch (error) {
     console.log("Erro ao enviar email:", error);
-    return { success: false, error: error.message }; // Retorna o erro
+    return { success: false, error: error.message };
   }
 }
-
 
 module.exports = { emailForgetPassword };
