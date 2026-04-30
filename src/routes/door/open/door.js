@@ -1,10 +1,12 @@
 const express = require("express");
+const { PrismaClient } = require("@prisma/client");
 
 const verifyUser = require("../../auth/auth/utils/auth");
 const logger = require("../../../middlewares/logger/logger");
 const espManager = require("../../../services/espManager");
 
-router = new express.Router();
+const router = new express.Router();
+const prisma = new PrismaClient();
 
 router.get("/open", async (req, res) => {
   const { isVerify } = await verifyUser.verifyUser(req.user);
@@ -31,7 +33,7 @@ router.get("/open", async (req, res) => {
 
 router.post("/mode", async (req, res) => {
   const { mode } = req.body;
-  if (mode === undefined) {
+  if (typeof mode !== "boolean") {
     return res.status(400).json({ success: false, error: "Mode not found" });
   }
 
@@ -49,7 +51,11 @@ router.post("/mode", async (req, res) => {
 
     logger.info(`Changing mode to ${mode} via WebSocket`);
     const response = await espManager.sendCommand("toggle-mode", { mode });
-    res.status(200).json({ success: true, data: response });
+    await prisma.ip.update({
+      where: { id: 1 },
+      data: { mode, updated_at: new Date() },
+    });
+    res.status(200).json({ success: true, data: { ...response, mode } });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -59,8 +65,8 @@ router.get("/mode", async (req, res) => {
   try {
     const { getMode } = require("../../health/heartbeat/utils/health");
     const mode = await getMode();
-    if (!mode) {
-      return res.status(404).json({ success: false, error: "Mode not found" });
+    if (mode instanceof Error) {
+      return res.status(404).json({ success: false, error: mode.message });
     }
     res.status(200).json({ success: true, data: mode });
   } catch (error) {
