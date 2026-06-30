@@ -16,14 +16,20 @@ const verifyToken = async (req, res, next) => {
   const secretKey = process.env.JWT_SECRET;
 
   try {
-    let userId;
-
     if (token == DOOR_KEY) {
-      userId = 777;
-    } else {
-      const verified = jwt.verify(token, secretKey);
-      userId = verified.userId;
+      req.user = {
+        id: 0,
+        name: "ESP32",
+        email: "esp32@fabricadoor.local",
+        isSuper: true,
+        isVerified: true,
+        isDevice: true,
+      };
+      return next();
     }
+
+    const verified = jwt.verify(token, secretKey);
+    const userId = verified.userId;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

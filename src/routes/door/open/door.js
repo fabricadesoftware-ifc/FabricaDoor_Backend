@@ -8,19 +8,39 @@ const espManager = require("../../../services/espManager");
 const router = new express.Router();
 const prisma = new PrismaClient();
 
-router.get("/open", async (req, res) => {
+const ensureEspConnected = (res) => {
+  if (espManager.isConnected()) {
+    return true;
+  }
+  res.status(503).json({ success: false, error: "ESP32 nao esta conectado" });
+  return false;
+};
+
+const ensureVerifiedUser = async (req, res) => {
   const { isVerify } = await verifyUser.verifyUser(req.user);
   if (!isVerify) {
-    return res
-      .status(403)
-      .json({ success: false, error: "User no have permision" });
+    res.status(403).json({ success: false, error: "User no have permision" });
+    return false;
   }
+  return true;
+};
+
+const ensureSuperUser = async (req, res) => {
+  const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
+  if (!isVerify || !isSuper) {
+    res
+      .status(403)
+      .json({ success: false, error: "User does not have permission" });
+    return false;
+  }
+  return true;
+};
+
+router.get("/open", async (req, res) => {
   try {
-    if (!espManager.isConnected()) {
-      return res
-        .status(503)
-        .json({ success: false, error: "ESP32 não está conectado" });
-    }
+    if (!(await ensureVerifiedUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
     logger.info("Opening door via WebSocket");
     const response = await espManager.sendCommand("open-door");
     res
@@ -38,24 +58,24 @@ router.post("/mode", async (req, res) => {
   }
 
   try {
-    const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
-
-    if (!isVerify || !isSuper) {
-      return res.status(403).json({ error: "User does not have permission" });
-    }
-    if (!espManager.isConnected()) {
-      return res
-        .status(503)
-        .json({ success: false, error: "ESP32 não está conectado" });
-    }
+    if (!(await ensureSuperUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
 
     logger.info(`Changing mode to ${mode} via WebSocket`);
     const response = await espManager.sendCommand("toggle-mode", { mode });
+    const confirmedMode =
+      typeof response.registration_mode === "boolean"
+        ? response.registration_mode
+        : mode;
+
     await prisma.ip.update({
       where: { id: 1 },
-      data: { mode, updated_at: new Date() },
+      data: { mode: confirmedMode, updated_at: new Date() },
     });
-    res.status(200).json({ success: true, data: { ...response, mode } });
+
+    res
+      .status(200)
+      .json({ success: true, data: { ...response, mode: confirmedMode } });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -76,13 +96,100 @@ router.get("/mode", async (req, res) => {
 
 router.get("/cache", async (req, res) => {
   try {
-    if (!espManager.isConnected()) {
-      return res
-        .status(503)
-        .json({ success: false, error: "ESP32 não está conectado" });
-    }
+    if (!ensureEspConnected(res)) return;
+
     logger.info("Refreshing ESP cache via WebSocket");
     const response = await espManager.sendCommand("refresh-cache");
+    res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.get("/fingerprints/status", async (req, res) => {
+  try {
+    if (!(await ensureVerifiedUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
+    const response = await espManager.sendCommand("fp-status");
+    res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.get("/fingerprints", async (req, res) => {
+  try {
+    if (!(await ensureVerifiedUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
+    const response = await espManager.sendCommand("list-fp");
+    res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/fingerprints/enroll", async (req, res) => {
+  const slot = Number(req.body.slot);
+  const userId = Number(req.body.userId);
+
+  if (!slot || !userId) {
+    return res
+      .status(400)
+      .json({ success: false, error: "slot and userId are required" });
+  }
+
+  try {
+    if (!(await ensureSuperUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
+    const response = await espManager.sendCommand("enroll-fp", {
+      slot,
+      user_id: userId,
+    });
+    res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/fingerprints/cancel", async (req, res) => {
+  try {
+    if (!(await ensureSuperUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
+    const response = await espManager.sendCommand("cancel-enroll-fp");
+    res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.delete("/fingerprints/:slot", async (req, res) => {
+  const slot = Number(req.params.slot);
+
+  if (!slot) {
+    return res.status(400).json({ success: false, error: "slot is required" });
+  }
+
+  try {
+    if (!(await ensureSuperUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
+    const response = await espManager.sendCommand("delete-fp", { slot });
+    res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/fingerprints/clear", async (req, res) => {
+  try {
+    if (!(await ensureSuperUser(req, res))) return;
+    if (!ensureEspConnected(res)) return;
+
+    const response = await espManager.sendCommand("clear-fp");
     res.status(200).json({ success: true, data: response });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

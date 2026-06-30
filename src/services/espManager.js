@@ -83,8 +83,8 @@ function sendCommand(action, payload = {}) {
 
     espSocket.emit("command", { action, ...payload }, (response) => {
       clearTimeout(timeout);
-      if (response?.error) {
-        reject(new Error(response.error));
+      if (response?.error || response?.success === false) {
+        reject(new Error(response?.error || `Comando '${action}' falhou`));
       } else {
         resolve(response);
       }
