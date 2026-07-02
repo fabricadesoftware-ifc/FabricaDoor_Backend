@@ -36,6 +36,22 @@ const ensureSuperUser = async (req, res) => {
   return true;
 };
 
+const getNextFingerprintSlot = (fingerprints = []) => {
+  const usedSlots = new Set(
+    fingerprints
+      .map((fingerprint) => Number(fingerprint.slot))
+      .filter((slot) => Number.isInteger(slot) && slot > 0),
+  );
+
+  for (let slot = 1; slot <= 162; slot += 1) {
+    if (!usedSlots.has(slot)) {
+      return slot;
+    }
+  }
+
+  return null;
+};
+
 router.get("/open", async (req, res) => {
   try {
     if (!(await ensureVerifiedUser(req, res))) return;
@@ -131,18 +147,26 @@ router.get("/fingerprints", async (req, res) => {
 });
 
 router.post("/fingerprints/enroll", async (req, res) => {
-  const slot = Number(req.body.slot);
   const userId = Number(req.body.userId);
 
-  if (!slot || !userId) {
+  if (!userId) {
     return res
       .status(400)
-      .json({ success: false, error: "slot and userId are required" });
+      .json({ success: false, error: "userId is required" });
   }
 
   try {
     if (!(await ensureSuperUser(req, res))) return;
     if (!ensureEspConnected(res)) return;
+
+    const listResponse = await espManager.sendCommand("list-fp");
+    const slot = getNextFingerprintSlot(listResponse.fingerprints);
+
+    if (!slot) {
+      return res
+        .status(409)
+        .json({ success: false, error: "No fingerprint slots available" });
+    }
 
     const response = await espManager.sendCommand("enroll-fp", {
       slot,
