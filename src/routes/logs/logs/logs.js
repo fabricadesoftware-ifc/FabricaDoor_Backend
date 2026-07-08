@@ -9,6 +9,17 @@ const verifyUser = require("../../auth/auth/utils/auth");
 
 const prisma = new PrismaClient();
 const TIMEZONE = "America/Sao_Paulo";
+const LOG_INCLUDE = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      picture: true,
+    },
+  },
+  rfid: true,
+};
 
 router = new express.Router();
 
@@ -76,17 +87,7 @@ router.get("/", async (req, res) => {
       orderBy: {
         date: "desc",
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            picture: true,
-          },
-        },
-        rfid: true,
-      },
+      include: LOG_INCLUDE,
     });
 
     logs.forEach((log) => {
@@ -125,7 +126,15 @@ router.post("/", async (req, res) => {
   res.status(200).json({ success: true, message: "Log is being processed" });
 
   try {
-    // Se não foi informado rfid_id, tenta extrair o código RFID da mensagem
+    // Compatibilidade com firmwares antigos que mandavam o id da biometria no texto.
+    if (!user_id) {
+      const bioMatch = message.match(/biometria.*\bid=(\d+)/i);
+      if (bioMatch) {
+        user_id = bioMatch[1];
+      }
+    }
+
+    // Se não foi informado rfid_id, tenta extrair o código RFID da mensagem.
     if (!rfid_id && !user_id) {
       const rfidMatch = message.match(/\b([A-Fa-f0-9]{8,})\b/);
       if (rfidMatch) {
@@ -150,6 +159,7 @@ router.post("/", async (req, res) => {
         ...(user_id && { user_id: Number(user_id) }),
         ...(rfid_id && { rfid_id: Number(rfid_id) }),
       },
+      include: LOG_INCLUDE,
     });
 
     io.io.emit("logs", { data: log });
@@ -168,17 +178,7 @@ router.get("/logs/user/:userId", async (req, res) => {
       orderBy: {
         date: "desc",
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            picture: true,
-          },
-        },
-        rfid: true,
-      },
+      include: LOG_INCLUDE,
     });
 
     logs.forEach((log) => {
@@ -200,6 +200,7 @@ async function userLog(userId, message, type, rfidId) {
         type,
         ...(rfidId && { rfid_id: rfidId }),
       },
+      include: LOG_INCLUDE,
     });
     io.io.emit("logs", { data: log });
   } catch (error) {
