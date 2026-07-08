@@ -4,6 +4,7 @@ const { PrismaClient } = require("@prisma/client");
 const verifyUser = require("../../auth/auth/utils/auth");
 const logger = require("../../../middlewares/logger/logger");
 const espManager = require("../../../services/espManager");
+const { userLog } = require("../../logs/logs/logs");
 
 const router = new express.Router();
 const prisma = new PrismaClient();
@@ -59,6 +60,7 @@ router.get("/open", async (req, res) => {
 
     logger.info("Opening door via WebSocket");
     const response = await espManager.sendCommand("open-door");
+    await userLog(req.user.id, "Porta aberta via frontend", "ACCESS_GRANTED");
     res
       .status(200)
       .json({ success: true, message: "Door opened", data: response });

@@ -57,6 +57,74 @@ router.get("/today", async (req, res) => {
   }
 });
 
+router.get("/user/:userId/summary", async (req, res) => {
+  const userId = Number(req.params.userId);
+
+  if (!userId) {
+    return res.status(400).json({ success: false, error: "userId is required" });
+  }
+
+  try {
+    const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
+    if (!isVerify || (!isSuper && req.user.id !== userId)) {
+      return res
+        .status(403)
+        .json({ success: false, error: "User no have permision" });
+    }
+
+    const baseWhere = {
+      user_id: userId,
+      type: "ACCESS_GRANTED",
+    };
+
+    const [totalAccess, biometricAccess, rfidAccess, frontendAccess, lastAccess] =
+      await Promise.all([
+        prisma.logs.count({ where: baseWhere }),
+        prisma.logs.count({
+          where: {
+            ...baseWhere,
+            message: { contains: "biometria", mode: "insensitive" },
+          },
+        }),
+        prisma.logs.count({
+          where: {
+            ...baseWhere,
+            OR: [
+              { rfid_id: { not: null } },
+              { message: { contains: "RFID", mode: "insensitive" } },
+            ],
+          },
+        }),
+        prisma.logs.count({
+          where: {
+            ...baseWhere,
+            message: { contains: "frontend", mode: "insensitive" },
+          },
+        }),
+        prisma.logs.findFirst({
+          where: baseWhere,
+          orderBy: { date: "desc" },
+          select: { id: true, type: true, message: true, date: true },
+        }),
+      ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalAccess,
+        biometricAccess,
+        rfidAccess,
+        frontendAccess,
+        lastAccess: lastAccess
+          ? { ...lastAccess, date: dateFormat(lastAccess.date) }
+          : null,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const { isVerify } = await verifyUser.verifyUser(req.user);
