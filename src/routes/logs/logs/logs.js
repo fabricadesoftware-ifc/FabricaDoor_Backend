@@ -152,6 +152,16 @@ router.post("/", async (req, res) => {
       }
     }
 
+    if (rfid_id && type === "ACCESS_GRANTED") {
+      await prisma.rfidTag.update({
+        where: { id: Number(rfid_id) },
+        data: {
+          last_time_used: new Date(),
+          used_times: { increment: 1 },
+        },
+      });
+    }
+
     const log = await prisma.logs.create({
       data: {
         type,

@@ -28,9 +28,10 @@ async function validateRfid(rfid) {
           where: { id: cachedTag.id },
           data: {
             last_time_used: new Date(),
-            used_times: cachedTag.used_times + 1,
+            used_times: { increment: 1 },
           },
         });
+        cachedTag.used_times += 1;
         return cachedTag.valid;
       } else {
         return false;
@@ -51,8 +52,9 @@ async function validateRfid(rfid) {
     if (tag) {
       await prisma.rfidTag.update({
         where: { id: tag.id },
-        data: { last_time_used: new Date(), used_times: tag.used_times + 1 },
+        data: { last_time_used: new Date(), used_times: { increment: 1 } },
       });
+      tag.used_times += 1;
       return tag.valid;
     }
   } catch (error) {
