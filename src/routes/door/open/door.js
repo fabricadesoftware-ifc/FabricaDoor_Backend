@@ -139,9 +139,29 @@ router.get("/fingerprints/status", async (req, res) => {
 router.get("/fingerprints", async (req, res) => {
   try {
     if (!(await ensureVerifiedUser(req, res))) return;
-    if (!ensureEspConnected(res)) return;
 
-    const response = await espManager.sendCommand("list-fp");
+    if (!espManager.isConnected()) {
+      const storedMappings = await prisma.fingerprint.findMany({
+        orderBy: { slot: "asc" },
+        select: { slot: true, user_id: true },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          success: true,
+          sensor_online: false,
+          source: "backend",
+          fingerprints: storedMappings.map((mapping) => ({
+            ...mapping,
+            mapped: true,
+            sensor_present: null,
+          })),
+        },
+      });
+    }
+
+    const response = await espManager.reconcileFingerprintMappings();
     res.status(200).json({ success: true, data: response });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -161,8 +181,25 @@ router.post("/fingerprints/enroll", async (req, res) => {
     if (!(await ensureSuperUser(req, res))) return;
     if (!ensureEspConnected(res)) return;
 
-    const listResponse = await espManager.sendCommand("list-fp");
-    const slot = getNextFingerprintSlot(listResponse.fingerprints);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, error: "User not found" });
+    }
+
+    const [listResponse, storedMappings] = await Promise.all([
+      espManager.reconcileFingerprintMappings(),
+      prisma.fingerprint.findMany({ select: { slot: true } }),
+    ]);
+    const slot = getNextFingerprintSlot([
+      ...(listResponse.fingerprints || []),
+      ...storedMappings,
+    ]);
 
     if (!slot) {
       return res
@@ -204,6 +241,7 @@ router.delete("/fingerprints/:slot", async (req, res) => {
     if (!ensureEspConnected(res)) return;
 
     const response = await espManager.sendCommand("delete-fp", { slot });
+    await prisma.fingerprint.deleteMany({ where: { slot } });
     res.status(200).json({ success: true, data: response });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -216,6 +254,7 @@ router.post("/fingerprints/clear", async (req, res) => {
     if (!ensureEspConnected(res)) return;
 
     const response = await espManager.sendCommand("clear-fp");
+    await prisma.fingerprint.deleteMany();
     res.status(200).json({ success: true, data: response });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

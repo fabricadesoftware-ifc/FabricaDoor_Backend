@@ -202,6 +202,17 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // Fallback do evento WebSocket: persiste o vínculo pelo log de conclusão.
+    const enrollmentMatch = message.match(/biometria cadastrada slot=(\d+)/i);
+    if (enrollmentMatch && user_id) {
+      const slot = Number(enrollmentMatch[1]);
+      await prisma.fingerprint.upsert({
+        where: { slot },
+        update: { user_id: Number(user_id) },
+        create: { slot, user_id: Number(user_id) },
+      });
+    }
+
     // Se não foi informado rfid_id, tenta extrair o código RFID da mensagem.
     if (!rfid_id && !user_id) {
       const rfidMatch = message.match(/\b([A-Fa-f0-9]{8,})\b/);
