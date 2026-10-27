@@ -78,8 +78,17 @@ router.get("/verify", async (req, res) => {
       .json({ success: false, error: "Authorization token is required" });
   }
 
+  const userData = verifyToken(token);
+  if (userData.error) {
+    const isExpired = userData.error === "jwt expired";
+    return res.status(401).json({
+      success: false,
+      error: userData.error,
+      ...(isExpired && { code: "TOKEN_EXPIRED" }),
+    });
+  }
+
   try {
-    const userData = verifyToken(token);
     const userVerification = await verifyUser(userData);
     return res.status(200).json({ success: true, data: userVerification });
   } catch (error) {
