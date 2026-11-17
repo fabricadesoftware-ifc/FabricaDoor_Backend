@@ -258,15 +258,31 @@ router.post("/", async (req, res) => {
 });
 
 router.get("/logs/user/:userId", async (req, res) => {
-  const { userId } = req.params;
+  const userId = Number(req.params.userId);
+
+  if (!userId) {
+    return res.status(400).json({ success: false, error: "userId is required" });
+  }
+
   try {
+    // Cada usuário só vê os próprios registros; admin vê os de qualquer um.
+    const { isVerify, isSuper } = await verifyUser.verifyUser(req.user);
+    if (!isVerify || (!isSuper && req.user.id !== userId)) {
+      return res
+        .status(403)
+        .json({ success: false, error: "User no have permision" });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+
     const logs = await prisma.logs.findMany({
       where: {
-        user_id: Number(userId),
+        user_id: userId,
       },
       orderBy: {
         date: "desc",
       },
+      take: limit,
       include: LOG_INCLUDE,
     });
 
