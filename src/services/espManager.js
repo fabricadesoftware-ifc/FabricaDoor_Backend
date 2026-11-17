@@ -5,7 +5,6 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 let espSocket = null;
-let mainIo = null;
 
 const COMMAND_TIMEOUT_MS = 10000;
 
@@ -120,8 +119,6 @@ async function reconcileFingerprintMappings(socket = espSocket) {
  * @param {import("socket.io").Server} io
  */
 function init(io) {
-  mainIo = io;
-
   const espNamespace = io.of("/esp");
 
   espNamespace.use((socket, next) => {
@@ -149,20 +146,11 @@ function init(io) {
 
     espSocket = socket;
 
-    // Notifica o frontend que o ESP está online
-    mainIo.emit("esp:status", { online: true });
-
     socket.on("disconnect", (reason) => {
       logger.info(`ESP32 disconnected: ${reason}`);
       if (espSocket?.id === socket.id) {
         espSocket = null;
       }
-      mainIo.emit("esp:status", { online: false });
-    });
-
-    // Log de eventos genéricos do ESP (heartbeat, status, etc.)
-    socket.on("heartbeat", (data) => {
-      logger.debug(`ESP heartbeat: ${JSON.stringify(data)}`);
     });
 
     socket.on("fingerprint:enrolled", async (data = {}) => {

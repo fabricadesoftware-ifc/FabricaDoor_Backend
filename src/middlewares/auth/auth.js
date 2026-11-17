@@ -55,9 +55,17 @@ const verifyToken = async (req, res, next) => {
         message: "Token expirado.",
         code: "TOKEN_EXPIRED",
       });
-    } else {
+    }
+
+    if (err.name === "JsonWebTokenError" || err.name === "NotBeforeError") {
       return res.status(401).json({ message: "Token inválido." });
     }
+
+    // Falha de banco ou outro erro interno: responder 401 aqui fazia o
+    // frontend deslogar o usuário por um problema que não é de login.
+    return res
+      .status(500)
+      .json({ message: "Erro interno ao validar o acesso." });
   }
 };
 

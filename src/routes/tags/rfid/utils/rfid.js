@@ -84,6 +84,9 @@ async function removeRfid(id) {
   try {
     const removedRfid = await prisma.rfidTag.delete({ where: { id: id } });
     logger.info("RFID removed successfully");
+    // Sem isto o ESP32 continua abrindo a porta para a tag apagada
+    // até a próxima renovação do cache (24 h).
+    await updateCache();
     return removedRfid;
   } catch (error) {
     return new Error(`Removal failed: ${error.message}`);

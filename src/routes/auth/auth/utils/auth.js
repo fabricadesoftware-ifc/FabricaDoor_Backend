@@ -15,7 +15,9 @@ const { verifyToken } = require("../../../../middlewares/index");
 
 const getRandomImageUrl = require("../../../../helpers/picture/picture_sorter");
 
-const cache = new NodeCache({ stdTTL: 864000, checkperiod: 1800 });
+// Cache curto da permissão (isSuper/isVerified). Com 10 dias, um usuário
+// recém-verificado continuava recebendo 403, e um revogado mantinha acesso.
+const cache = new NodeCache({ stdTTL: 60, checkperiod: 120 });
 const prisma = new PrismaClient();
 
 /**

@@ -146,8 +146,12 @@ router.post("/refresh", async (req, res) => {
       data: user,
     });
   } catch (error) {
+    // O token já foi validado acima; o que chega aqui é falha interna
+    // (banco). Responder 401 fazia o frontend deslogar o usuário.
     logger.error(`Refresh token route error: ${error.message}`);
-    return res.status(401).json({ success: false, error: "Invalid refresh token" });
+    return res
+      .status(500)
+      .json({ success: false, error: "Internal error refreshing token" });
   }
 });
 
